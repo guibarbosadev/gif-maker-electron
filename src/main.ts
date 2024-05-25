@@ -1,4 +1,4 @@
-import { app, BrowserWindow, desktopCapturer } from "electron";
+import { app, BrowserWindow, desktopCapturer, screen } from "electron";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -8,7 +8,7 @@ if (require("electron-squirrel-startup")) {
   app.quit();
 }
 
-const createWindow = () => {
+const createWindow = async () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
@@ -20,9 +20,9 @@ const createWindow = () => {
 
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    await mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(
+    await mainWindow.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)
     );
   }
@@ -34,13 +34,18 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on("ready", async () => {
-  const mainWindow = createWindow();
+  await createWindow();
 
   try {
+    const screenSize = screen.getPrimaryDisplay().workAreaSize;
+    const thumbnailSize = {
+      width: screenSize.width,
+      height: screenSize.height,
+    };
     const sources = await desktopCapturer.getSources({
       types: ["screen"],
       fetchWindowIcons: true,
-      thumbnailSize: { width: 1500, height: 1000 },
+      thumbnailSize,
     });
     const [firstScreen] = sources ?? [];
 
@@ -50,7 +55,11 @@ app.on("ready", async () => {
       `Screenshot-${Date.now()}.png`
     );
 
-    fs.writeFile(screenshotPath, firstScreen.thumbnail.toPNG(), (error) => {
+    const image = firstScreen.thumbnail
+      // .crop({ x: 0, y: 0, width: 300, height: 300 })
+      .toPNG();
+
+    fs.writeFile(screenshotPath, image, (error) => {
       if (error) return console.log("Error: ", error);
     });
   } catch (error) {
